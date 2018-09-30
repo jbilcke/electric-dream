@@ -1,0 +1,358 @@
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				background:#000;
+				color:#fff;
+				padding:0;
+				margin:0;
+				font-weight: bold;
+				overflow:hidden;
+			}
+
+			a {	color: #ffffff;	}
+
+			#info {
+				position: absolute;
+				top: 0px; width: 100%;
+				color: #ffffff;
+				padding: 5px;
+				font-family:Monospace;
+				font-size:13px;
+				text-align:center;
+				z-index:1000;
+			}
+
+			#webglmessage {
+				background:rgb(200,100,0) !important;
+				color:#fff;
+			}
+
+			#vt { display:none }
+			#vt, #vt a { color:orange; }
+		</style>
+	</head>
+
+	<body>
+
+		<script src="js/three.js"></script>
+		<script src="js/loaders/GLTFLoader.js"></script>
+		<script src="js/controls/OrbitControls.js"></script>
+		<script src="js/WebGL.js"></script>
+		<script src="js/libs/stats.min.js"></script>
+
+		<script>
+
+			if ( WEBGL.isWebGLAvailable() === false ) {
+
+				document.body.appendChild( WEBGL.getWebGLErrorMessage() );
+
+			}
+
+			var statsEnabled = true;
+
+			var container, stats, loader;
+
+			var camera, scene, renderer;
+
+			var mesh;
+
+			var spotLight;
+
+			var mouseX = 0;
+			var mouseY = 0;
+
+			var targetX = 0;
+			var targetY = 0;
+
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+
+			init();
+			animate();
+
+	function createProjectedText( txt, fontSize, depth, color ) {
+
+// too much intensity creates a nice white to color gradient
+var intensity = 40;
+
+var pointLight = new THREE.PointLight( color, intensity, depth, 2 );
+pointLight.castShadow = true;
+pointLight.shadow.camera.near = 0.1;
+pointLight.shadow.camera.far = 800; // not too high!
+pointLight.shadow.bias = - 0.005; // reduces self-shadowing on double-sided objects
+pointLight.shadow.radius = 4;
+
+         pointLight.shadow.mapSize.width = 2048;
+				 pointLight.shadow.mapSize.height = 2048;
+
+				//pointLight.shadow.camera.near = 200;
+				//pointLight.shadow.camera.far = 1500;
+
+		// size of the projected shadow (big fov = smaller)
+				pointLight.shadow.camera.fov = 120;
+
+var geometry = new THREE.SphereBufferGeometry( 0.6, 8, 8 );
+var material = new THREE.MeshBasicMaterial( { color: color } );
+material.color.multiplyScalar( intensity );
+var sphere = new THREE.Mesh( geometry, material );
+pointLight.add( sphere );
+
+var texture = new THREE.CanvasTexture( createProjectedTextTexture(txt, fontSize) );
+// var texture = createLabel("HI", 0, 1, 0, 24);
+texture.magFilter = THREE.LinearFilter;
+texture.wrapT = THREE.RepeatWrapping;
+texture.wrapS = THREE.RepeatWrapping;
+// texture.scale.x = 0.8;
+// texture.scale.y = 0.8;
+texture.repeat.set( -1, 1 );
+// texture.scale.x = -1;
+var geometry = new THREE.SphereBufferGeometry( 2, 32, 32 );
+
+var material = new THREE.MeshPhongMaterial( {
+	side: THREE.DoubleSide,
+	alphaMap: texture,
+	alphaTest: 0.5,
+	transparency: 0.2
+} );
+
+var sphere = new THREE.Mesh( geometry, material );
+sphere.castShadow = true;
+sphere.receiveShadow = true;
+pointLight.add( sphere );
+
+// const spot = createSpotlight( 0xFF7F00 )
+// spot.position.x = 10;
+// pointLight.add( spot )
+
+// custom distance material
+var distanceMaterial = new THREE.MeshDistanceMaterial( {
+	alphaMap: material.alphaMap,
+	alphaTest: material.alphaTest
+} );
+sphere.customDistanceMaterial = distanceMaterial;
+
+return pointLight;
+
+}
+function createProjectedTextTexture(txt, size) {
+
+var canvas = document.createElement( 'canvas' );
+
+const resolution = 4096
+
+canvas.width = resolution;
+canvas.height = resolution;
+
+var context = canvas.getContext( '2d' );
+// context.scale(-1, 0);
+context.fillStyle = 'white';
+context.fillRect( 0, 0, resolution, resolution );
+
+context.font = size + "pt Helvetica"
+context.textAlign = "center"
+context.textBaseline = "middle"
+context.fillStyle = "black"
+// context.shadowColor = "red"
+// context.shadowOffsetX = 10
+// context.shadowOffsetY = 10
+// context.shadowBlur = 10
+context.fillText(txt, canvas.width / 2, canvas.height / 2)
+
+return canvas;
+
+}
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				//
+
+				camera = new THREE.PerspectiveCamera(
+					27,
+					window.innerWidth / window.innerHeight,
+					1,
+					10000
+				);
+				camera.position.x = -600;
+				camera.position.y = 200;
+				camera.position.z = 0;
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0x060708 );
+
+				// LIGHTS
+
+				scene.add( new THREE.HemisphereLight( 0x010102, 0x010102 ) );
+
+			
+				var lightColor1 = 0x0088ff
+				var lightColor2 = 0x88ff00
+				var lightDepth = 500
+				var fontSize = 90
+
+				var x1 = -500
+				var y1 = 30
+				
+				var x2 = -500
+				var y2 = 10
+
+				spotLight1 = new THREE.SpotLight( lightColor1, 0.005 );
+				spotLight1.position.set( x1, y1, 0 );
+				// spotLight1.position.multiplyScalar( 10 );
+				scene.add( spotLight1 );
+				spotLight1.castShadow = true;
+				spotLight1.shadow.mapSize.width = 2048;
+				spotLight1.shadow.mapSize.height = 2048;
+				spotLight1.shadow.camera.near = 100;
+				spotLight1.shadow.camera.far = 300;
+				spotLight1.shadow.camera.fov = 120;
+				spotLight1.shadow.bias = -0.005;
+	
+
+				var textLight1 = createProjectedText( 'ELECTRIC', 64, lightDepth, lightColor1 )
+				textLight1.position.set( x1, y1, 0 );
+				// textLight1.position.multiplyScalar( 12 );
+				textLight1.scale.set( 3, 3, 3 );
+				scene.add( textLight1  )
+
+
+		    spotLight2 = new THREE.SpotLight( lightColor2, 0.005 );
+				spotLight2.position.set( x2, y2, 0 );
+				// spotLight2.position.multiplyScalar( 10 );
+				scene.add( spotLight2 );
+				spotLight2.castShadow = true;
+				spotLight2.shadow.mapSize.width = 2048;
+				spotLight2.shadow.mapSize.height = 2048;
+				spotLight2.shadow.camera.near = 100;
+				spotLight2.shadow.camera.far = 300;
+				spotLight2.shadow.camera.fov = 120;
+				spotLight2.shadow.bias = -0.005;
+	
+
+				var textLight2 = createProjectedText( 'DREAM', 90, lightDepth, lightColor2 )
+				textLight2.position.set( x2, y2, 0 );
+				// textLight2.position.multiplyScalar( 12 );
+				textLight2.scale.set( 3, 3, 3 );
+				scene.add( textLight2  )
+				//
+
+				var mapHeight = new THREE.TextureLoader().load( "models/gltf/LeePerrySmith/Infinite-Level_02_Disp_NoSmoothUV-4096.jpg" );
+
+				var material = new THREE.MeshPhongMaterial( {
+					color: 0x653821,
+					specular: 0x282282,
+					shininess: 100,
+					bumpMap: mapHeight,
+					bumpScale: 10
+				} );
+
+				loader = new THREE.GLTFLoader();
+				loader.load( "models/gltf/LeePerrySmith/LeePerrySmith.glb", function( gltf ) {
+					 createScene( gltf.scene.children[ 0 ].geometry, 60, material )
+					 } );
+
+				renderer = new THREE.WebGLRenderer();
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				container.appendChild( renderer.domElement );
+
+				renderer.shadowMap.enabled = true;
+				renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+				//
+
+				renderer.gammaInput = true;
+				renderer.gammaOutput = true;
+
+				//
+
+				if ( statsEnabled ) {
+
+					stats = new Stats();
+					container.appendChild( stats.dom );
+
+				}
+
+				var controls = new THREE.OrbitControls( camera, renderer.domElement );
+				controls.target.set( 0, 10, 0 );
+				controls.update();
+
+				// EVENTS
+
+				// document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+				window.addEventListener( 'resize', onWindowResize, false );
+
+			}
+
+			function createScene( geometry, scale, material ) {
+
+				mesh = new THREE.Mesh( geometry, material );
+
+				mesh.position.y = - 80;
+				mesh.scale.set( scale, scale, scale );
+
+				mesh.castShadow = true;
+				mesh.receiveShadow = true;
+
+				scene.add( mesh );
+
+			}
+
+			//
+
+			function onWindowResize( event ) {
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+			}
+
+			function onDocumentMouseMove( event ) {
+
+				mouseX = ( event.clientX - windowHalfX );
+				mouseY = ( event.clientY - windowHalfY );
+
+			}
+
+			//
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				render();
+				if ( statsEnabled ) stats.update();
+
+			}
+
+			function render() {
+				var time = performance.now() * 0.000002;
+
+				targetX = mouseX * .001;
+				targetY = mouseY * .001;
+
+				// time += 10000;
+
+				if ( mesh ) {
+
+					// mesh.rotation.y += 0.05 * ( targetX - mesh.rotation.y );
+					// mesh.rotation.x += 0.05 * ( targetY - mesh.rotation.x );
+					mesh.rotation.y += 0.007;
+				}
+
+				renderer.render( scene, camera );
+
+			}
+
+		</script>
+
+	</body>
+</html>
+	
